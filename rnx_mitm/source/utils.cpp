@@ -59,6 +59,8 @@ static HblOverrideConfig g_hbl_override_config = {
 /* Static buffer for loader.ini contents at runtime. */
 static char g_config_ini_data[0x800];
 
+static FsFile g_emummc_file = {0};
+
 static bool IsHexadecimal(const char *str) {
     while (*str) {
         if (isxdigit(*str)) {
@@ -142,6 +144,18 @@ void Utils::InitializeThreadFunc(void *args) {
     
     Utils::RefreshConfiguration();
     
+
+        /* If we're emummc, persist a write handle to prevent other processes from touching the image. */
+    if (IsEmummc()) {
+        const char *emummc_file_path = GetEmummcFilePath();
+        if (emummc_file_path != nullptr) {
+            char emummc_path[0x100] = {0};
+            std::strncpy(emummc_path, emummc_file_path, 0x80);
+            std::strcat(emummc_path, "/eMMC");
+            fsFsOpenFile(&g_sd_filesystem, emummc_file_path, FS_OPEN_READ | FS_OPEN_WRITE, &g_emummc_file);
+        }
+    }
+
     /* Initialize set:sys. */
     DoWithSmSession([&]() {
         if (R_FAILED(setsysInitialize())) {
